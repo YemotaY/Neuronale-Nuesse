@@ -40,6 +40,7 @@ class nn_imgLoader:
             if(imgPath == ""): raise Exception(f"Missing Path for loadSingle:{imgPath}")
             image = Image.open(imgPath)
             obj = {"imgObj":image,"format":image.format,"size":image.size,"mode":image.mode,"tags":image.getexif()}
+            image.load()  # Pixeldaten laden, damit der Datei-Handle geschlossen wird
             self.images.append(obj)
             #print(f"Image loaded : {obj}")
         except Exception as e:

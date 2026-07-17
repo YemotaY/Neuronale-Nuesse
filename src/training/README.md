@@ -10,6 +10,8 @@ Auswertung und Modell-Export ab und enthält zusätzlich eine GUI zum Tagging.
 |------------------------------|-----------------------------------------------------------------------|
 | `nn_Trainer.py`              | Haupt-Trainingspipeline (Keras/TensorFlow, per `__main__` ausführbar). |
 | `nn_Trainer_torch.py`        | Gleiche Pipeline als **PyTorch**-Variante (EfficientNet-B3).           |
+| `nn_config.py`               | Zentrale Konfiguration (lädt `config.json`, Defaults als Dataclass).  |
+| `config.json`                | Hyperparameter: Bildgröße, Batch-Size, Epochen, Balancing, LR, Seed.  |
 | `nn_imgLoader.py`            | Laden von Bildern + EXIF-Metadaten, Klassen-/Ordner-Auflistung.       |
 | `nn_interactiveTraining.py`  | Keras-Callback zum interaktiven Steuern des Trainings.                |
 | `nn_gui_imgTagger.py`        | Tkinter-GUI zum Verschlagworten von Bildern (EXIF).                   |
@@ -23,7 +25,7 @@ training/
 ├── valid/<klasse>/*.jpg     # Validierungsdaten
 ├── test/<klasse>/*.jpg      # Testdaten
 ├── aug/                     # generierte Augmentierungs-Bilder (Balancing)
-└── model/                   # exportierte Modelle (*.h5) + *.labels.json
+└── model/                   # exportierte Modelle (*.h5 / *.tflite) + *.labels.*
 ```
 
 ## Schnellstart
@@ -33,8 +35,72 @@ cd "Neuronale Nüsse 2.0"
 python src/training/nn_Trainer.py
 ```
 
-Die Pipeline durchläuft: Laden → Balancing → Generatoren → Modellaufbau →
-Training → Auswertung → Vorhersage → Speichern.
+Die Pipeline durchläuft: Laden → Balancing → Datasets → Modellaufbau →
+Training → Auswertung → Vorhersage → Speichern → TFLite-Export.
+
+## Konfiguration (`nn_config` / `config.json`)
+
+Alle Hyperparameter liegen zentral in `config.json` und werden beim Erzeugen
+des Trainers automatisch geladen. Fehlt die Datei, greifen die Defaults aus
+`TrainerConfig`.
+
+```json
+{
+  "image_size": [200, 200],
+  "batch_size": 20,
+  "epochs": 40,
+  "ask_epoch": 40,
+  "balance_count": 200,
+  "learning_rate": 0.001,
+  "seed": 123
+}
+```
+
+```python
+from nn_config import TrainerConfig
+from nn_Trainer import nn_Trainer
+
+# aus config.json (Default)
+trainer = nn_Trainer()
+
+# oder programmatisch überschreiben
+trainer = nn_Trainer(config=TrainerConfig(epochs=2, batch_size=8))
+```
+
+Eine Vorlage schreiben: `python src/training/nn_config.py`.
+
+## Datenpipeline (tf.data)
+
+Statt des veralteten `ImageDataGenerator` nutzt der Trainer nun
+`keras.utils.image_dataset_from_directory` + `tf.data`:
+
+- Konsistente, alphabetische Klassenreihenfolge über alle Splits (`class_names`).
+- Augmentierung on-the-fly über Keras-Preprocessing-Layer (`RandomFlip`,
+  `RandomRotation`, `RandomTranslation`, `RandomZoom`) – nur auf Trainingsdaten.
+- `prefetch(AUTOTUNE)` für bessere Auslastung.
+- Balancing-Bilder aus `aug/` werden automatisch an das Trainings-Dataset
+  angehängt.
+
+## TensorFlow-Lite-Export (Edge-Geräte)
+
+`exportTFLite(errors, tests, quantize=True)` konvertiert das trainierte Modell
+nach `model/nuts_<acc>.tflite` (mit Dynamic-Range-Quantisierung) und schreibt
+die Labels zusätzlich als `nuts_<acc>.labels.txt` für minimale Edge-Runtimes.
+
+## Tests
+
+Unit-Tests liegen unter `tests/` (stdlib `unittest`, kein pytest nötig):
+
+```bash
+# schnelle Tests (Loader + Config)
+python -m unittest tests.test_nn_imgLoader tests.test_nn_config
+
+# Runtime-Tests (baut ein winziges Keras-Modell)
+python -m unittest tests.test_runtime
+
+# End-to-End-Smoke-Test der Pipeline (2 Epochen, headless)
+MPLBACKEND=Agg python tests/_smoke_e2e.py
+```
 
 ## PyTorch-Variante (`nn_Trainer_torch`)
 
@@ -69,19 +135,17 @@ Unterschiede zur Keras-Version:
 |----------------------|-------------------------------------------------------------------------------|
 | `loadLearnData()`    | Baut Train/Valid/Test-DataFrames, ermittelt Klassen und Bildstatistiken.     |
 | `balance(df, n, ..)` | Hebt unterrepräsentierte Klassen per Augmentation auf mind. `n` Bilder an.    |
-| `configureModell()`  | Erstellt die `ImageDataGenerator` und berechnet die Test-Batch-Größe.        |
+| `configureModell()`  | Baut Train/Valid/Test-`tf.data`-Datasets (`image_dataset_from_directory`).    |
 | `modellMixer()`      | Baut EfficientNetB3 + Dense-Kopf und kompiliert das Modell.                   |
 | `startTraining()`    | Startet `model.fit` mit dem interaktiven Callback.                            |
 | `analyzeTraining()`  | Plottet Loss-/Accuracy-Verläufe inkl. bester Epoche.                          |
 | `simplePredict()`    | Vorhersage auf dem Testset, Confusion-Matrix + Classification-Report.        |
 | `storeModell(e, t)`  | Speichert Modell als `nuts_<acc>.h5` **und** die Klassen als `.labels.json`. |
+| `exportTFLite(e, t)` | Exportiert ein quantisiertes `nuts_<acc>.tflite` + `.labels.txt`.            |
 
-Zentrale Parameter (in `nn_Trainer.__init__` / Methoden):
-
-- `imageSize = (200, 200)` – Eingabegröße (muss mit der Runtime übereinstimmen).
-- `batch_size = 20` – Training/Validierung.
-- `epochs = 40`, `ask_epoch = 40` – Trainingsdauer und Abfrageintervall.
-- Balance-Ziel `n = 200` (im `__main__`-Aufruf gesetzt).
+Zentrale Parameter kommen aus `config.json` (siehe oben) und sind über
+`trainer.config` bzw. direkt als Attribute (`imageSize`, `batch_size`,
+`epochs`, `ask_epoch`, `learning_rate`, `seed`) verfügbar.
 
 ## Interaktives Training (`nn_interactiveTraining`)
 

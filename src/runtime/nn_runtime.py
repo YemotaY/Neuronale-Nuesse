@@ -52,8 +52,10 @@ class NutClassifier:
             raise FileNotFoundError(f"Modell nicht gefunden: {model_path}")
 
         self.model_path = model_path
-        self.image_size = image_size
         self.model = tf.keras.models.load_model(model_path)
+        # Eingabegröße bevorzugt aus dem Modell ableiten (robust gegen
+        # abweichende Defaults); sonst den übergebenen Wert nutzen.
+        self.image_size = self._infer_image_size(image_size)
         self.class_names = class_names or self._infer_class_names()
 
         out_units = int(self.model.output_shape[-1])
@@ -64,6 +66,18 @@ class NutClassifier:
                 file=sys.stderr,
             )
             self.class_names = [f"Klasse_{i}" for i in range(out_units)]
+
+    def _infer_image_size(self, fallback):
+        """Liest (H, W) aus der Modell-Eingabeform, falls verfügbar."""
+        try:
+            shape = self.model.input_shape  # z. B. (None, 200, 200, 3)
+            if isinstance(shape, list):
+                shape = shape[0]
+            if shape and shape[1] and shape[2]:
+                return (int(shape[1]), int(shape[2]))
+        except (AttributeError, IndexError, TypeError):
+            pass
+        return fallback
 
     def _infer_class_names(self):
         """Leitet die Klassennamen ab.

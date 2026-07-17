@@ -1,0 +1,9 @@
+{
+  "image_size": [200, 200],
+  "batch_size": 20,
+  "epochs": 40,
+  "ask_epoch": 40,
+  "balance_count": 200,
+  "learning_rate": 0.001,
+  "seed": 123
+}

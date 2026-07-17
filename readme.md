@@ -193,7 +193,6 @@ Die ausführliche Projektdokumentation und die Präsentation liegen unter
 <summary>📄 Projektdokumentation (PDF)</summary>
 
 - [Projektdoku_DE.pdf](src/docs/Projektdoku_DE.pdf) – ausführliche Projektdokumentation
-- [Projektdoku_DE.odt](src/docs/Projektdoku_DE.odt) – OpenDocument-Original
 
 > Hinweis: GitHub bindet PDFs nicht inline ein. Der Link öffnet die Datei im
 > PDF-Viewer bzw. lädt sie herunter.
@@ -209,13 +208,31 @@ Die ausführliche Projektdokumentation und die Präsentation liegen unter
 
 ---
 
+## Tests
+
+Unit-Tests (stdlib `unittest`, kein pytest nötig) liegen unter `tests/`:
+
+```bash
+# Loader + Config (schnell)
+python -m unittest tests.test_nn_imgLoader tests.test_nn_config
+
+# Runtime (baut ein winziges Keras-Modell)
+python -m unittest tests.test_runtime
+
+# End-to-End-Smoke-Test der Pipeline (2 Epochen, headless)
+MPLBACKEND=Agg python tests/_smoke_e2e.py
+```
+
+---
+
 ## Roadmap
 
 - [x] Klassennamen zusammen mit dem Modell serialisieren (`*.labels.json`).
-- [ ] Konfiguration (Bildgröße, Batch-Size, Epochen) in eine Config-Datei auslagern.
-- [ ] Umstieg von `ImageDataGenerator` auf `tf.data` / `keras.utils.image_dataset_from_directory`.
-- [ ] Unit-Tests für Loader und Runtime.
-- [ ] Export nach TensorFlow Lite für Edge-Geräte.
+- [x] Konfiguration (Bildgröße, Batch-Size, Epochen) in `config.json` ausgelagert.
+- [x] Umstieg von `ImageDataGenerator` auf `tf.data` / `image_dataset_from_directory`.
+- [x] Unit-Tests für Loader und Runtime.
+- [x] Export nach TensorFlow Lite für Edge-Geräte.
+- [ ] Weitere Datensätze / Klassen ergänzen und Genauigkeit steigern.
 
 ---
 
