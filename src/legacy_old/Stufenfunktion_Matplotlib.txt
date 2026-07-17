@@ -1,0 +1,28 @@
+Stufenfunktion in Matplotlib:
+
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+x = [-1,0,0.999,1,2]
+# y-Werte mit der Funktion entscheidung berechnehn und mithilfe
+# einer list Comprehension in eine neue liste erzgeugen
+y = [entscheidung(i) for i in x]
+
+# erzeugen des dazugehörigen graphen
+plt.step(x, y, color='Blue', label='Step')
+
+# Die achsen setzen
+plt.grid(True)
+# Die horizontale und vertikale 0-Achse etwas dicker in Schwarz zeichnen
+plt.axhline(0, color='black', lw=1)
+plt.axvline(0, color='black', lw=1)
+
+# Axenbeschriftung und Titel
+plt.xlabel('Summe')
+plt.ylabel('Ergebnis')
+plt.title('Stufenfunktion')
+
+# Legendplatzierung festlegen
+plt.legend(loc='center right')
+
+plt.show()

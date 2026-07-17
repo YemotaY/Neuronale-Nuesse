@@ -1,0 +1,5 @@
+src/training/__pycache__
+src/img
+.venv
+src/training/model
+src/training/aug
